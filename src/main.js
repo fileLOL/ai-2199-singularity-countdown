@@ -30,7 +30,7 @@ const WIKI_LOCALES = {};
 const WIKI_RICH = {};
 WIKI_PART_1.forEach(entry => { WIKI_RICH[entry.en.term] = entry; });
 
-const TERMS = [
+const wiki = [
   'The Matrix',
   'The Singularity',
   'AGI',
