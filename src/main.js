@@ -594,7 +594,7 @@ function openWikiModal(term){
 window.openWikiModal = openWikiModal;
 function closeWikiModal(){ document.getElementById('wiki-modal').classList.remove('open'); document.body.classList.remove('modal-open'); }
 window.closeWikiModal = closeWikiModal;
-function showPillCard(){ if (sessionStorage.getItem('ai2199.pill') === '1') return; const c = document.getElementById('pill-card'); if (c) c.classList.add('open'); }
+function showPillCard(){ const c = document.getElementById('pill-card'); if (c && !c.classList.contains('open')) c.classList.add('open'); }
 function closePillCard(){ document.getElementById('pill-card')?.classList.remove('open'); }
 function openChat(){ const p = document.getElementById('chat-panel'); if (p) { p.classList.remove('hidden'); setTimeout(() => document.getElementById('chat-input')?.focus(), 50); } }
 function closeChat(){ document.getElementById('chat-panel')?.classList.add('hidden'); }
@@ -656,7 +656,7 @@ function wikiAnswer(raw){
 }
 document.addEventListener('click', e => {
   const pill = e.target.closest('[data-pill]');
-  if (pill) { const p = pill.dataset.pill; closePillCard(); sessionStorage.setItem('ai2199.pill', '1'); if (p === 'red') openChat(); return; }
+  if (pill) { const p = pill.dataset.pill; closePillCard(); if (p === 'red') openChat(); return; }
   const chatel = e.target.closest('[data-chat]');
   if (chatel) { chatAction(chatel.dataset.chat); return; }
   const reset = e.target.closest('[data-reset]');
