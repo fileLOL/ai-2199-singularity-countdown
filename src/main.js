@@ -456,12 +456,32 @@ function shell(content, title=''){
       <div id="modal-body"></div>
     </div>
   </div>
+  <div id="pill-card" class="pill-card" role="dialog" aria-modal="true">
+    <div class="pill-body">
+      <div class="eyebrow">${t('pill.eyebrow')}</div>
+      <p class="pill-quote">${t('pill.text')}</p>
+      <div class="pill-actions">
+        <button class="pill red" data-pill="red">${t('pill.red')}</button>
+        <button class="pill blue" data-pill="blue">${t('pill.blue')}</button>
+      </div>
+      <button class="pill-skip" data-pill="none">${t('pill.skip')}</button>
+    </div>
+  </div>
+  <div id="chat-panel" class="chat hidden" role="dialog" aria-modal="true">
+    <div class="chat-head"><span class="dot"></span><span>${t('chat.title')}</span><button onclick="closeChat()">×</button></div>
+    <div id="chat-messages" class="chat-messages">
+      <div class="chat-ai"><p>${t('chat.greeting')}</p><p class="chat-chips">${chip(t('chat.random'), 'rand')} ${chip(t('chat.quickHelp'), 'help')}</p></div>
+      <div class="chat-note">${t('chat.reason')}</div>
+    </div>
+    <form id="chat-form"><input id="chat-input" placeholder="${t('chat.placeholder')}" autocomplete="off" /><button type="submit">↗</button></form>
+  </div>
   <div id="terminal" class="terminal hidden" role="dialog" aria-modal="true">
     <div class="term-head"><span>AI2199@matrix:~$</span><button onclick="closeTerminal()">×</button></div>
     <div id="term-output" class="term-output"><p>${t('terminal.init')}</p><p>${t('terminal.type')}</p></div>
     <form id="term-form"><span>guest@2199:~$</span><input id="term-input" autocomplete="off" autofocus /></form>
   </div>`;
   bindTerminal();
+  bindChat();
   bindLang();
 }
 
@@ -512,6 +532,8 @@ function wikiPage(){shell(`<section class="page-head"><div class="eyebrow">${t('
   q.addEventListener('input', () => { WQ = q.value; renderWiki(); });
   document.querySelectorAll('.wiki-filter').forEach(b => b.addEventListener('click', () => { WT = b.dataset.tag === 'all' ? '' : b.dataset.tag; syncWikiFilters(); renderWiki(); }));
   renderWiki();
+  clearTimeout(window.pillTimer);
+  window.pillTimer = setTimeout(() => { if (location.hash.replace('#','') === '/wiki') showPillCard(); }, 5000);
 }
 function syncWikiFilters(){ document.querySelectorAll('.wiki-filter').forEach(b => b.classList.toggle('active', (WT === '' ? 'all' : WT) === b.dataset.tag)); }
 function renderWiki(){
@@ -572,7 +594,71 @@ function openWikiModal(term){
 window.openWikiModal = openWikiModal;
 function closeWikiModal(){ document.getElementById('wiki-modal').classList.remove('open'); document.body.classList.remove('modal-open'); }
 window.closeWikiModal = closeWikiModal;
+function showPillCard(){ if (sessionStorage.getItem('ai2199.pill') === '1') return; const c = document.getElementById('pill-card'); if (c) c.classList.add('open'); }
+function closePillCard(){ document.getElementById('pill-card')?.classList.remove('open'); }
+function openChat(){ const p = document.getElementById('chat-panel'); if (p) { p.classList.remove('hidden'); setTimeout(() => document.getElementById('chat-input')?.focus(), 50); } }
+function closeChat(){ document.getElementById('chat-panel')?.classList.add('hidden'); }
+window.openChat = openChat; window.closeChat = closeChat;
+function bindChat(){
+  const form = document.getElementById('chat-form'); if (!form) return;
+  form.onsubmit = e => { e.preventDefault(); const inp = document.getElementById('chat-input'); const v = (inp.value || '').trim(); if (v) chatAsk(v); };
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function chip(label, spec){ return `<button class="chip" data-chat="${spec}">${label}</button>`; }
+function chatAsk(text){
+  const box = document.getElementById('chat-messages'); if (!box) return;
+  const inp = document.getElementById('chat-input'); if (inp) inp.value = '';
+  box.insertAdjacentHTML('beforeend', `<div class="chat-user">${escapeHtml(text)}</div>`);
+  box.insertAdjacentHTML('beforeend', `<div class="chat-ai">${wikiAnswer(text)}</div>`);
+  box.scrollTop = box.scrollHeight;
+}
+function chatAction(spec){
+  const i = spec.indexOf(':');
+  const kind = i === -1 ? spec : spec.slice(0, i);
+  const val = i === -1 ? '' : spec.slice(i + 1);
+  if (kind === 'term') { closeChat(); openWikiModal(val); return; }
+  if (kind === 'rel') { chatAsk('rel:' + val); return; }
+  if (kind === 'list') { chatAsk('llista'); return; }
+  if (kind === 'rand') { chatAsk('__rand__'); return; }
+  if (kind === 'help') { chatAsk('help'); return; }
+  if (kind === 'web') { window.open('https://duckduckgo.com/?q=' + encodeURIComponent(val + ' AI'), '_blank', 'noopener'); return; }
+  if (kind === 'tag') { closeChat(); WQ = ''; WT = val; const q = document.getElementById('wiki-q'); if (q) q.value = ''; syncWikiFilters(); renderWiki(); document.getElementById('wiki-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+}
+function wikiAnswer(raw){
+  const s = String(raw).trim().toLowerCase();
+  if (s === '__rand__') { const it = wiki[Math.floor(Math.random() * wiki.length)]; return `<b>${it.term}</b><p>${it.d[dk()]}</p><p class="chat-chips">${chip(t('chat.openCard'), 'term:' + it.term)} ${chip(t('chat.relatedOf') + '…', 'rel:' + it.term)}</p>`; }
+  if (/^(ajuda|help|ayuda|ajut)$/.test(s)) return `<p>${t('chat.help')}</p><p class="chat-chips">${chip(t('chat.list'), 'list')} ${chip(t('chat.quickHelp'), 'help')}</p>`;
+  const matchTerm = q => wiki.find(w => w.term.toLowerCase() === q) || wiki.find(w => { const a = w.alias; return a && Object.values(a).some(x => x && x.toLowerCase() === q); });
+  const rel = s.match(/(?:relacionat|related|relacionad)s?\s+(?:de|amb|of|with)?\s*(.+)$/);
+  if (rel) {
+    const it = matchTerm(rel[1].trim());
+    if (it) return it.rels.length ? `<b>${t('chat.relatedOf')} ${it.term}</b><p class="chat-chips">${it.rels.map(r => { const x = wikiEntry(r); return x ? chip(x.term, 'term:' + x.term) : ''; }).join(' ')}</p>` : `<b>${t('chat.relatedOf')} ${it.term}</b><p>—</p>`;
+    return `<p>${t('chat.noMatch')}</p>`;
+  }
+  if (/^(llista|list|categories)/.test(s)) return `<p>${t('chat.list')}</p><p class="chat-chips">${['ia','seg','fut','fil','bio','cul'].map(x => chip(tagLabel(x), 'tag:' + x)).join(' ')}</p>`;
+  const obj = s.match(/^(obr|abre|op[ae]n|open)\s+(.+)$/);
+  if (obj) { const it = matchTerm(obj[2].trim()); if (it) { closeChat(); openWikiModal(it.term); return ''; } }
+  const hit = matchTerm(s);
+  if (hit) {
+    const k = dk(); const long = hit.long && hit.long[k];
+    return `<b>${hit.term}</b><p>${hit.d[k]}</p>${long ? `<p>${long}</p>` : ''}<p class="chat-chips">${chip(t('chat.openCard'), 'term:' + hit.term)}${hit.rels.length ? ' ' + chip(t('chat.relatedOf') + '…', 'rel:' + hit.term) : ''} ${chip(t('chat.seeAlso') + ' ↗', 'web:' + hit.term)}</p>`;
+  }
+  const cats = [['ia', /\b(ai|ia|intel|intell|artificial|machine|cogniti|neural|learning)\b/], ['seg', /\b(segur|secur|hack|privacy|privac|vigil|defens)\b/], ['fut', /\b(futur|future|singular|transhuman|posthuman)\b/], ['fil', /\b(filos|philo|etic|ethic|valors|values)\b/], ['bio', /\b(biolog|life|vida|genet|hum[àa]n)\b/], ['cul', /\b(cultur|culture|matrix|cyber|cinema|literatur)\b/]];
+  const cat = cats.find(([, re]) => re.test(s));
+  if (cat) {
+    const list = wiki.filter(w => w.tags.includes(cat[0])).slice(0, 5);
+    return `<p>${tagLabel(cat[0])} (${list.length})</p><p class="chat-chips">${list.map(x => chip(x.term, 'term:' + x.term)).join(' ')}</p>`;
+  }
+  const words = s.replace(/[^a-zà-ÿ0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+  const scored = words.length ? wiki.map(w => ({ w, s: words.filter(wd => (w.term + ' ' + w.d.en + ' ' + w.d.ca + ' ' + w.d.cast + ' ' + w.tags.join(' ')).toLowerCase().includes(wd)).length })).filter(x => x.s > 0).sort((a, b) => b.s - a.s).slice(0, 3) : [];
+  if (scored.length) return `<p>${t('chat.try')}:</p><p class="chat-chips">${scored.map(x => chip(x.w.term, 'term:' + x.w.term)).join(' ')}</p>`;
+  return `<p>${t('chat.noMatch')}</p><p class="chat-chips">${chip(t('chat.random'), 'rand')} ${chip(t('chat.list'), 'list')}</p>`;
+}
 document.addEventListener('click', e => {
+  const pill = e.target.closest('[data-pill]');
+  if (pill) { const p = pill.dataset.pill; closePillCard(); sessionStorage.setItem('ai2199.pill', '1'); if (p === 'red') openChat(); return; }
+  const chatel = e.target.closest('[data-chat]');
+  if (chatel) { chatAction(chatel.dataset.chat); return; }
   const reset = e.target.closest('[data-reset]');
   if (reset) { WQ = ''; WT = ''; const q = document.getElementById('wiki-q'); if (q) q.value = ''; syncWikiFilters(); renderWiki(); closeWikiModal(); return; }
   const tgt = e.target.closest('#modal-body [data-open], #modal-body [data-rel]');
@@ -599,7 +685,7 @@ function closeTerminal(){document.querySelector('#terminal')?.classList.add('hid
 window.openTerminal=openTerminal;window.closeTerminal=closeTerminal;
 function bindTerminal(){const form=document.querySelector('#term-form');if(!form)return;form.onsubmit=e=>{e.preventDefault();const input=document.querySelector('#term-input');const cmd=input.value.trim().toLowerCase();const out=document.querySelector('#term-output');input.value='';let r='';if(cmd==='help')r=t('terminal.help');else if(cmd==='status')r=t('terminal.status');else if(cmd==='wiki')r=t('terminal.wiki');else if(cmd==='matrix')r=t('terminal.matrix');else if(cmd==='countdown')r=t('terminal.countdown');else if(cmd==='share')r=t('terminal.share');else if(cmd==='clear'){out.innerHTML='';return;}else if(cmd==='exit'){closeTerminal();return;}else r=`${t('terminal.unknown')}: ${cmd || '∅'}`;out.innerHTML+=`<p><span class="green">guest@2199:~$</span> ${cmd}</p><p>${r}</p>`;if(cmd==='wiki')location.hash='/wiki';if(cmd==='countdown')location.hash='/countdown';if(cmd==='share')copyViral();};}
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeWikiModal(); closeTerminal(); return; }
+  if (e.key === 'Escape') { closeWikiModal(); closeTerminal(); closePillCard(); closeChat(); return; }
   if (!document.getElementById('wiki-modal').classList.contains('open')) return;
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
     const idx = wiki.findIndex(w => w.term === CURRENT);
