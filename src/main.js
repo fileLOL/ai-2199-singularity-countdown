@@ -419,6 +419,8 @@ function route(){
     '/faq': faqPage,
     '/about': aboutPage,
   };
+  document.title = t('seo.title');
+  document.documentElement.lang = LANG === 'cat' ? 'ca' : LANG === 'cast' ? 'es' : 'en';
   (pages[path] || notFound)();
   window.scrollTo({top:0, behavior:'instant'});
   updateActiveNav(path);
@@ -502,22 +504,12 @@ function countdownPage(){shell(`<section class="page-head"><div class="eyebrow">
 
 function singularityPage(){shell(`<section class="page-head"><div class="eyebrow">${t('singularity.eyebrow')}</div><h1>${t('singularity.h1a')}</h1><p>${t('singularity.sub')}</p></section><section class="article"><h2>${t('singularity.defTitle')}</h2><p>${t('singularity.defBody')}</p><div class="warning">${t('singularity.warn')}</div><h2>${t('singularity.scenariosTitle')}</h2><div class="scenario"><b>${t('singularity.scA')}</b><p>${t('singularity.scAd')}</p></div><div class="scenario"><b>${t('singularity.scB')}</b><p>${t('singularity.scBd')}</p></div><div class="scenario"><b>${t('singularity.scC')}</b><p>${t('singularity.scCd')}</p></div><h2>${t('singularity.questionsTitle')}</h2><ul class="terminal-list">${['q1','q2','q3','q4','q5','q6'].map(q=>`<li>${t('singularity.'+q)}</li>`).join('')}</ul></section>`, 'singularity');}
 
-let WQ = '', WT = '';
+let WQ = '', WT = '', CURRENT = '';
 function tagLabel(tag){ return tag === 'all' ? t('wiki.all') : t('wiki.tag.' + tag); }
 function dk(){ return LANG_KEY[LANG]; }
 function wikiPage(){shell(`<section class="page-head"><div class="eyebrow">${t('wiki.eyebrow')}</div><h1>${t('wiki.h1a')}</h1><p>${t('wiki.intro', { n: '<b id="wiki-count">' + wiki.length + '</b>' })}</p></section><div class="wiki-controls"><input id="wiki-q" class="wiki-search" placeholder="${t('wiki.search')}" autocomplete="off" /><div class="wiki-filters">${['all','ia','seg','fut','fil','bio','cul'].map(x=>`<button class="wiki-filter${x==='all'?' active':''}" data-tag="${x}">${tagLabel(x)}</button>`).join('')}</div></div><section id="wiki-grid" class="wiki-grid"></section><section class="external"><div><div class="eyebrow">${t('wiki.externalCodes')}</div><h2>matrix-codes.netlify.app</h2><p>${t('wiki.externalCodesDesc')}</p></div><a class="btn primary" href="${links.codes}" target="_blank" rel="noopener">${t('wiki.openCodes')}</a></section><section class="external second"><div><div class="eyebrow">${t('wiki.externalMind')}</div><h2>matrix-mind.netlify.app</h2><p>${t('wiki.externalMindDesc')}</p></div><a class="btn ghost" href="${links.mind}" target="_blank" rel="noopener">${t('wiki.openMind')}</a></section>`, 'wiki');
-  const grid = document.getElementById('wiki-grid');
   const q = document.getElementById('wiki-q');
   q.addEventListener('input', () => { WQ = q.value; renderWiki(); });
-  grid.addEventListener('click', e => {
-    const chip = e.target.closest('.chip');
-    if (chip) { WQ = chip.dataset.t; WT = ''; q.value = WQ; syncWikiFilters(); renderWiki(); return; }
-    const card = e.target.closest('.wiki-item');
-    if (card) openWikiModal(card.dataset.open);
-  });
-  grid.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { const card = e.target.closest('.wiki-item'); if (card) openWikiModal(card.dataset.open); }
-  });
   document.querySelectorAll('.wiki-filter').forEach(b => b.addEventListener('click', () => { WT = b.dataset.tag === 'all' ? '' : b.dataset.tag; syncWikiFilters(); renderWiki(); }));
   renderWiki();
 }
@@ -526,31 +518,40 @@ function renderWiki(){
   const grid = document.getElementById('wiki-grid'); if (!grid) return;
   const raw = WQ.trim().toLowerCase();
   const k = dk();
-  const rows = wiki.filter(it => {
+  let rows = wiki.filter(it => {
     if (raw && ![it.n, it.term, ...it.rels].join(' ').toLowerCase().includes(raw)) return false;
     if (raw && !it.d[k].toLowerCase().includes(raw)) return false;
     if (WT && !it.tags.includes(WT)) return false;
     return true;
   });
-  grid.innerHTML = rows.map(it => `<article class="wiki-item" tabindex="0" data-open="${it.term}"><span>${it.n}</span><div class="wiki-tags">${it.tags.map(x => `<i class="ptag ${x}">${tagLabel(x)}</i>`).join('')}</div><h2>${it.term}</h2><p>${it.d[k]}</p><button class="wiki-open">↗ ${t('card.read')}</button></article>`).join('') || `<p class="wiki-empty">NO RESULTS</p>`;
   const c = document.getElementById('wiki-count'); if (c) c.textContent = rows.length;
+  if (!rows.length) { grid.innerHTML = `<p class="wiki-empty">NO RESULTS<br><button class="wiki-reset" data-reset="1">${t('wiki.resetBtn')}</button></p>`; return; }
+  grid.innerHTML = rows.map(it => `<article class="wiki-item" tabindex="0" data-open="${it.term}"><span>${it.n}</span><div class="wiki-tags">${it.tags.map(x => `<i class="ptag ${x}">${tagLabel(x)}</i>`).join('')}</div><h2>${it.term}</h2><p>${it.d[k]}</p><button class="wiki-open">↗ ${t('card.read')}</button></article>`).join('');
+  grid.querySelectorAll('.wiki-item').forEach(card => {
+    card.addEventListener('click', () => openWikiModal(card.dataset.open));
+    card.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); openWikiModal(card.dataset.open); } });
+  });
 }
 function wikiEntry(term){ return wiki.find(w => w.term === term); }
 function openWikiModal(term){
   const it = wikiEntry(term); if (!it) return;
+  CURRENT = it.term;
   const k = dk();
+  const idx = wiki.findIndex(w => w.term === it.term);
+  const prev = wiki[(idx - 1 + wiki.length) % wiki.length];
+  const next = wiki[(idx + 1) % wiki.length];
   const long = it.long && it.long[k];
   const facets = it.facets && it.facets[k];
   const alias = it.alias && it.alias[k] && it.alias[k] !== it.term ? `<div class="modal-alias">${it.alias[k]}</div>` : '';
   let linksHtml = '';
   if (it.wiki) {
-    const idx = { cat: 2, cast: 1, eng: 0 }[LANG];
+    const idxLang = { cat: 2, cast: 1, eng: 0 }[LANG];
     const host = { cat: 'ca', cast: 'es', eng: 'en' }[LANG];
-    if (it.wiki[idx]) linksHtml += `<a class="modal-link" href="https://${host}.wikipedia.org/wiki/${it.wiki[idx]}" target="_blank" rel="noopener">Wikipedia ↗</a>`;
+    if (it.wiki[idxLang]) linksHtml += `<a class="modal-link" href="https://${host}.wikipedia.org/wiki/${it.wiki[idxLang]}" target="_blank" rel="noopener">Wikipedia ↗</a>`;
   }
   linksHtml += `<a class="modal-link" href="https://duckduckgo.com/?q=${encodeURIComponent(it.term + ' AI')}" target="_blank" rel="noopener">${t('modal.websearch')} ↗</a>`;
   document.getElementById('modal-body').innerHTML = `
-    <div class="eyebrow">04 // MATRIX WIKI · ${it.n}</div>
+    <div class="eyebrow">04 // MATRIX WIKI · ${it.n}/${wiki.length}</div>
     <h2>${it.term}</h2>
     ${alias}
     <div class="wiki-tags">${it.tags.map(x => `<i class="ptag ${x}">${tagLabel(x)}</i>`).join('')}</div>
@@ -559,17 +560,24 @@ function openWikiModal(term){
     ${facets && facets.length ? `<h3>${t('modal.facetTitle')}</h3><ul class="facets">${facets.map(f => `<li>${f}</li>`).join('')}</ul>` : ''}
     ${it.rels.length ? `<h3>${t('modal.related')}</h3><p class="modal-rels">${it.rels.map(r => `<button class="chip" data-rel="${encodeURIComponent(r)}">${r}</button>`).join(' ')}</p>` : ''}
     <h3>${t('modal.links')}</h3>
-    <div class="modal-links">${linksHtml}</div>`;
-  document.getElementById('modal-body').addEventListener('click', e => {
-    const ch = e.target.closest('[data-rel]');
-    if (ch) openWikiModal(decodeURIComponent(ch.dataset.rel));
-  });
+    <div class="modal-links">${linksHtml}</div>
+    <div class="modal-nav">
+      <button class="modal-nav-btn prev" data-open="${prev.term}"><span class="arrow">←</span><span class="txt"><i>${t('modal.prev')}</i><b>${prev.term}</b></span></button>
+      <button class="modal-nav-btn next" data-open="${next.term}"><span class="txt"><i>${t('modal.next')}</i><b>${next.term}</b></span><span class="arrow">→</span></button>
+    </div>`;
   document.getElementById('wiki-modal').classList.add('open');
   document.body.classList.add('modal-open');
+  document.getElementById('modal-body').scrollTop = 0;
 }
 window.openWikiModal = openWikiModal;
 function closeWikiModal(){ document.getElementById('wiki-modal').classList.remove('open'); document.body.classList.remove('modal-open'); }
 window.closeWikiModal = closeWikiModal;
+document.addEventListener('click', e => {
+  const reset = e.target.closest('[data-reset]');
+  if (reset) { WQ = ''; WT = ''; const q = document.getElementById('wiki-q'); if (q) q.value = ''; syncWikiFilters(); renderWiki(); closeWikiModal(); return; }
+  const tgt = e.target.closest('#modal-body [data-open], #modal-body [data-rel]');
+  if (tgt) openWikiModal(tgt.dataset.open || decodeURIComponent(tgt.dataset.rel));
+});
 
 function manifestoPage(){shell(`<section class="page-head"><div class="eyebrow">${t('manifesto.eyebrow')}</div><h1>${t('manifesto.h1a')}</h1></section><section class="manifesto"><ol>${MAN.map((k,i)=>`<li><b>0${i+1}</b><span>${t('manifesto.'+k)}</span></li>`).join('')}</ol></section>`, 'manifesto');}
 
@@ -590,7 +598,16 @@ function openTerminal(){document.querySelector('#terminal')?.classList.remove('h
 function closeTerminal(){document.querySelector('#terminal')?.classList.add('hidden')}
 window.openTerminal=openTerminal;window.closeTerminal=closeTerminal;
 function bindTerminal(){const form=document.querySelector('#term-form');if(!form)return;form.onsubmit=e=>{e.preventDefault();const input=document.querySelector('#term-input');const cmd=input.value.trim().toLowerCase();const out=document.querySelector('#term-output');input.value='';let r='';if(cmd==='help')r=t('terminal.help');else if(cmd==='status')r=t('terminal.status');else if(cmd==='wiki')r=t('terminal.wiki');else if(cmd==='matrix')r=t('terminal.matrix');else if(cmd==='countdown')r=t('terminal.countdown');else if(cmd==='share')r=t('terminal.share');else if(cmd==='clear'){out.innerHTML='';return;}else if(cmd==='exit'){closeTerminal();return;}else r=`${t('terminal.unknown')}: ${cmd || '∅'}`;out.innerHTML+=`<p><span class="green">guest@2199:~$</span> ${cmd}</p><p>${r}</p>`;if(cmd==='wiki')location.hash='/wiki';if(cmd==='countdown')location.hash='/countdown';if(cmd==='share')copyViral();};}
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeWikiModal(); closeTerminal(); } });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeWikiModal(); closeTerminal(); return; }
+  if (!document.getElementById('wiki-modal').classList.contains('open')) return;
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    const idx = wiki.findIndex(w => w.term === CURRENT);
+    if (idx === -1) return;
+    const dir = e.key === 'ArrowLeft' ? -1 : 1;
+    openWikiModal(wiki[(idx + dir + wiki.length) % wiki.length].term);
+  }
+});
 window.addEventListener('hashchange',route);route();
 
 // Matrix-style background. Decorative only.
