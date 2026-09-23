@@ -1,6 +1,8 @@
 import './style.css';
+import { I18N, LANGS, DEFAULT_LANG } from './i18n.js';
 import { R1 } from './wiki-data-1.js';
 import { R2 } from './wiki-data-2.js';
+import { WIKI_PART_1 } from './wiki-part1.js';
 
 const TARGET = new Date('2199-01-01T00:00:00Z');
 const ORIGIN = new Date('2026-01-01T00:00:00Z');
@@ -9,13 +11,26 @@ const links = {
   mind: 'https://matrix-mind.netlify.app/'
 };
 
+const LANG_KEY = { cat: 'ca', cast: 'cast', eng: 'en' };
+let LANG = localStorage.getItem('ai2199.lang') || DEFAULT_LANG;
+if (!LANGS.includes(LANG)) LANG = DEFAULT_LANG;
+function t(key, vars) {
+  const v = I18N[LANG][key];
+  if (v == null) return key;
+  if (typeof v === 'string' && vars) return v.replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? vars[k] : '{' + k + '}'));
+  return v;
+}
+
 const WIKI_LOCALES = {};
 [...R1, ...R2].forEach(([term, tags, rels, en, ca, cast]) => {
   if (term in WIKI_LOCALES) return;
   WIKI_LOCALES[term] = { tags, rels, en, ca, cast };
 });
 
-const wiki = [
+const WIKI_RICH = {};
+WIKI_PART_1.forEach(entry => { WIKI_RICH[entry.en.term] = entry; });
+
+const TERMS = [
   'The Matrix',
   'The Singularity',
   'AGI',
@@ -193,7 +208,7 @@ const wiki = [
   'Cognitive Augmentation',
   'Hybrid Intelligence',
   'The Long Reflection'
-].map((t, i) => { const m = WIKI_LOCALES[t] || {}; const en = m.en || [
+].map((term, i) => { const m = WIKI_LOCALES[term] || {}; const en = m.en || [
   'A cultural idea about simulated reality, networked identity, control, and the boundary between a human world and an engineered world.',
   'A hypothetical point at which technological progress, especially machine intelligence, becomes so rapid or transformative that ordinary forecasting breaks down.',
   'Artificial General Intelligence: a proposed class of AI able to perform a broad range of cognitive tasks rather than being narrowly optimized for one domain.',
@@ -371,16 +386,24 @@ const wiki = [
   'Tools that extend memory, reasoning and creativity rather than replace them.',
   'Designing human–machine teams where each does what it does best.',
   'The call to think hard about our long-term future before capability outruns wisdom.'
-][i]; return [String(i + 1).padStart(2, '0'), t, m.tags || [], m.rels || [], { en, ca: m.ca || en, cast: m.cast || en }]; }
+][i];
+  const r = WIKI_RICH[term];
+  return {
+    n: String(i + 1).padStart(2, '0'),
+    term,
+    tags: m.tags || [],
+    rels: m.rels || [],
+    d: { en, ca: m.ca || en, cast: m.cast || en },
+    long: r ? { en: r.en.long, ca: r.ca.long, cast: r.cast.long } : null,
+    facets: r ? { en: r.en.facets, ca: r.ca.facets, cast: r.cast.facets } : null,
+    alias: r ? { en: r.en.term, ca: r.ca.term, cast: r.cast.term } : null,
+    wiki: (r && r.w) ? r.w : null
+  };
+}
 );
-
-const milestones = [
-  ['2026', 'NOW', 'The clock starts here. AI is already a general-purpose interface to knowledge, code and creation.'],
-  ['2030', 'NEXT', 'Near-term scenario space: stronger agents, robotics, scientific automation and increasingly autonomous software.'],
-  ['2050', 'HORIZON', 'A deliberately uncertain horizon: machine intelligence, energy, biology and robotics could reshape institutions.'],
-  ['2100', 'DEEP FUTURE', 'Forecasting becomes fragile. The point is not certainty; it is to keep asking what values survive technological change.'],
-  ['2199', 'ZERO', 'The countdown reaches its symbolic endpoint. The real experiment is what humanity did with the time before it.']
-];
+const TL = [['2026', 'tl.now', 'tl.2026'], ['2030', 'tl.next', 'tl.2030'], ['2050', 'tl.horizon', 'tl.2050'], ['2100', 'tl.deep', 'tl.2100'], ['2199', 'tl.zero', 'tl.2199']];
+const FAQ = [['q1', 'a1'], ['q2', 'a2'], ['q3', 'a3'], ['q4', 'a4'], ['q5', 'a5'], ['q6', 'a6']];
+const MAN = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6'];
 
 const app = document.querySelector('#app');
 
@@ -404,28 +427,49 @@ function route(){
 function shell(content, title=''){
   app.innerHTML = `
   <header class="nav">
-    <a class="brand" href="#/"><span class="sigil">AI</span><span>2199<span class="dim">//</span>NULL</span></a>
+    <a class="brand" href="#/"><span class="sigil">AI</span><span>2199<span class="dim">//</span>NULL</span><span class="brand-sub">${t('brand.sub')}</span></a>
     <nav>
-      <a data-nav="/countdown" href="#/countdown">COUNTDOWN</a>
-      <a data-nav="/singularity" href="#/singularity">SINGULARITY</a>
-      <a data-nav="/wiki" href="#/wiki">WIKI</a>
-      <a data-nav="/timeline" href="#/timeline">TIMELINE</a>
+      <a data-nav="/countdown" href="#/countdown">${t('nav.countdown')}</a>
+      <a data-nav="/singularity" href="#/singularity">${t('nav.singularity')}</a>
+      <a data-nav="/wiki" href="#/wiki">${t('nav.wiki')}</a>
+      <a data-nav="/timeline" href="#/timeline">${t('nav.timeline')}</a>
     </nav>
-    <button class="terminal-btn" onclick="openTerminal()">[ TERMINAL ]</button>
+    <div class="nav-actions">
+      <div class="lang-switch" role="group" aria-label="language">
+        ${LANGS.map(l => `<button class="lang-btn${l===LANG?' active':''}" data-lang="${l}" title="${l}">${l==='eng'?'EN':l==='cast'?'CAST':'CAT'}</button>`).join('')}
+      </div>
+      <button class="terminal-btn" onclick="openTerminal()">${t('nav.terminal')}</button>
+    </div>
   </header>
   <main>${content}</main>
   <footer>
-    <div><strong>AI-2199</strong> // A long-horizon thought experiment</div>
-    <div class="footer-links"><a href="#/manifesto">Manifesto</a><a href="#/faq">FAQ</a><a href="#/about">About</a><a href="${links.codes}" target="_blank" rel="noopener">matrix-codes ↗</a><a href="${links.mind}" target="_blank" rel="noopener">matrix-mind ↗</a></div>
-    <div class="footer-note">No prophecy. No certainty. Just a clock.</div>
+    <div><strong>AI-2199</strong> // ${t('footer.tag')}</div>
+    <div class="footer-links"><a href="#/manifesto">${t('footer.manifesto')}</a><a href="#/faq">FAQ</a><a href="#/about">${t('footer.about')}</a><a href="${links.codes}" target="_blank" rel="noopener">matrix-codes ↗</a><a href="${links.mind}" target="_blank" rel="noopener">matrix-mind ↗</a></div>
+    <div class="footer-note">${t('footer.note')}</div>
   </footer>
   <div id="toast" class="toast" aria-live="polite"></div>
+  <div id="wiki-modal" class="modal" role="dialog" aria-modal="true" onclick="if(event.target===this)closeWikiModal()">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeWikiModal()" aria-label="close">${t('modal.close')}</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
   <div id="terminal" class="terminal hidden" role="dialog" aria-modal="true">
     <div class="term-head"><span>AI2199@matrix:~$</span><button onclick="closeTerminal()">×</button></div>
-    <div id="term-output" class="term-output"><p>AI-2199 secure shell initialized.</p><p>Type <b>help</b> for commands.</p></div>
+    <div id="term-output" class="term-output"><p>${t('terminal.init')}</p><p>${t('terminal.type')}</p></div>
     <form id="term-form"><span>guest@2199:~$</span><input id="term-input" autocomplete="off" autofocus /></form>
   </div>`;
   bindTerminal();
+  bindLang();
+}
+
+function bindLang(){
+  document.querySelectorAll('.lang-btn').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.lang === LANG) return;
+    LANG = b.dataset.lang;
+    localStorage.setItem('ai2199.lang', LANG);
+    route();
+  }));
 }
 
 function updateActiveNav(path){document.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===path));}
@@ -435,89 +479,118 @@ function countdownValues(){
   const years=(days/365.2425).toFixed(2);
   return {days,hours,mins,secs,years,ms};
 }
-function countdownMarkup(big=true){const v=countdownValues(); return `<div class="count-grid ${big?'big':''}" id="countdown-grid"><div><b id="years">${v.years}</b><span>YEARS</span></div><div><b id="days">${String(v.days).padStart(6,'0')}</b><span>DAYS</span></div><div><b id="hours">${String(v.hours).padStart(2,'0')}</b><span>HOURS</span></div><div><b id="mins">${String(v.mins).padStart(2,'0')}</b><span>MIN</span></div><div><b id="secs">${String(v.secs).padStart(2,'0')}</b><span>SEC</span></div></div>`;}
+function countdownMarkup(big=true){const v=countdownValues(); return `<div class="count-grid ${big?'big':''}" id="countdown-grid"><div><b id="years">${v.years}</b><span>${t('term.years')}</span></div><div><b id="days">${String(v.days).padStart(6,'0')}</b><span>${t('term.days')}</span></div><div><b id="hours">${String(v.hours).padStart(2,'0')}</b><span>${t('term.hours')}</span></div><div><b id="mins">${String(v.mins).padStart(2,'0')}</b><span>${t('term.min')}</span></div><div><b id="secs">${String(v.secs).padStart(2,'0')}</b><span>${t('term.sec')}</span></div></div>`;}
 
 function home(){shell(`
 <section class="hero">
   <div class="hero-copy">
-    <div class="eyebrow">[ LONG HORIZON PROTOCOL // ONLINE ]</div>
-    <h1>THE CLOCK IS<br><span>ALREADY RUNNING.</span></h1>
-    <p class="lede">A countdown to <strong>01.01.2199</strong> — the symbolic horizon for a question that may define this century: <em>what happens when machine intelligence stops being merely a tool?</em></p>
-    <div class="hero-actions"><a class="btn primary" href="#/countdown">ENTER THE COUNTDOWN →</a><button class="btn ghost" onclick="shareSite()">↗ SHARE THE CLOCK</button></div>
+    <div class="eyebrow">${t('hero.eyebrow')}</div>
+    <h1>${t('hero.h1a')}</h1>
+    <p class="lede">${t('hero.lede1')} ${t('hero.lede2')}</p>
+    <div class="hero-actions"><a class="btn primary" href="#/countdown">${t('hero.ctaCountdown')}</a><button class="btn ghost" onclick="shareSite()">${t('hero.ctaShare')}</button></div>
   </div>
   <div class="hero-clock">${countdownMarkup()}</div>
 </section>
-<section class="ticker"><span>2199</span><span>AGI</span><span>ASI?</span><span>HUMANITY</span><span>ETHICS</span><span>MATRIX</span><span>2199</span></section>
-<section class="split reveal"><div><div class="eyebrow">01 // THE PREMISE</div><h2>Not a prediction.<br><span>A pressure test.</span></h2></div><div class="prose"><p>Nobody knows if a technological singularity will happen, what form it would take, or whether “singularity” is even the right word. This site turns that uncertainty into a visual object: <strong>a clock pointed at 2199.</strong></p><p>The date is intentionally distant. It gives us room to think about intelligence, autonomy, power, creativity, safety, identity and the future without pretending we can forecast the next 173 years.</p></div></section>
-<section class="cards reveal"><a href="#/singularity" class="card"><span>01</span><h3>What is the singularity?</h3><p>Definitions, scenarios and the arguments around recursive improvement.</p><b>READ FILE →</b></a><a href="#/wiki" class="card"><span>02</span><h3>Matrix Wiki</h3><p>Decode the language: AGI, ASI, cyberpunk, simulation, agents and more.</p><b>OPEN WIKI →</b></a><a href="${links.codes}" target="_blank" class="card"><span>03</span><h3>Matrix Codes</h3><p>A connected project for code, experiments and the ethical hacker mindset.</p><b>VISIT PROJECT →</b></a></section>
-<section class="share-panel reveal"><div><div class="eyebrow">THE VIRAL LOOP</div><h2>Send someone<br><span>173 years into the future.</span></h2></div><div><p>Copy a message with the live countdown. The recipient opens the same clock, then shares it again.</p><button class="btn primary" onclick="copyViral()">COPY VIRAL MESSAGE</button><button class="btn ghost" onclick="shareSite()">SHARE DIRECTLY</button></div></section>
-<section class="quote reveal"><div class="quote-mark">“</div><blockquote>The future is not a date. It is everything we decide before the date arrives.</blockquote><div class="quote-by">AI-2199 // ORIGINAL TEXT</div></section>
+<section class="ticker">${t('ticker').map(x=>`<span>${x}</span>`).join('')}</section>
+<section class="split reveal"><div><div class="eyebrow">${t('premise.eyebrow')}</div><h2>${t('premise.h2a')}</h2></div><div class="prose"><p>${t('premise.p1')}</p><p>${t('premise.p2')}</p></div></section>
+<section class="cards reveal"><a href="#/singularity" class="card"><span>01</span><h3>${t('card.sing.title')}</h3><p>${t('card.sing.desc')}</p><b>${t('card.read')}</b></a><a href="#/wiki" class="card"><span>02</span><h3>${t('card.wiki.title')}</h3><p>${t('card.wiki.desc')}</p><b>${t('card.open')}</b></a><a href="${links.codes}" target="_blank" class="card"><span>03</span><h3>${t('card.codes.title')}</h3><p>${t('card.codes.desc')}</p><b>${t('card.visit')}</b></a></section>
+<section class="share-panel reveal"><div><div class="eyebrow">${t('share.eyebrow')}</div><h2>${t('share.h2a')}</h2></div><div><p>${t('share.p')}</p><button class="btn primary" onclick="copyViral()">${t('share.copyViral')}</button><button class="btn ghost" onclick="shareSite()">${t('share.shareDirect')}</button></div></section>
+<section class="quote reveal"><div class="quote-mark">“</div><blockquote>${t('quote.text')}</blockquote><div class="quote-by">${t('quote.by')}</div></section>
 `, 'home'); startTicker();}
 
-function countdownPage(){shell(`<section class="page-head"><div class="eyebrow">02 // COUNTDOWN PROTOCOL</div><h1>ZERO HOUR:<br><span>01 JAN 2199</span></h1><p>One fixed date. A constantly moving present.</p></section><section class="countdown-full">${countdownMarkup()}<div class="target">TARGET TIMESTAMP <strong>2199-01-01 00:00:00 UTC</strong></div></section><section class="meter"><div class="meter-label"><span>TIME ELAPSED SINCE 2026</span><span id="percent"></span></div><div class="meter-bar"><i id="meter-fill"></i></div><p class="muted">The progress bar is deliberately symbolic: it measures the fraction of the 2026→2199 interval that has elapsed.</p></section><section class="grid-2"><div class="terminal-card"><span class="prompt">root@ai-2199:~$</span><h2>WHY 2199?</h2><p>Because a distant deadline changes the question. Instead of “what happens next year?”, we can ask “what kind of civilization could exist at the other end of this century?”</p></div><div class="terminal-card"><span class="prompt">system.log</span><h2>STATUS</h2><p><b class="green">ONLINE</b> — clock synchronized locally. No server-side countdown is required. Your browser calculates the remaining time.</p></div></section>`, 'countdown'); startTicker(); updateProgress();}
+function countdownPage(){shell(`<section class="page-head"><div class="eyebrow">${t('countdown.eyebrow')}</div><h1>${t('countdown.h1a')}</h1><p>${t('countdown.sub')}</p></section><section class="countdown-full">${countdownMarkup()}<div class="target">${t('term.target')} <strong>2199-01-01 00:00:00 UTC</strong></div></section><section class="meter"><div class="meter-label"><span>${t('term.elapsed')}</span><span id="percent"></span></div><div class="meter-bar"><i id="meter-fill"></i></div><p class="muted">${t('countdown.meterNote')}</p></section><section class="grid-2"><div class="terminal-card"><span class="prompt">root@ai-2199:~$</span><h2>${t('countdown.whyTitle')}</h2><p>${t('countdown.whyBody')}</p></div><div class="terminal-card"><span class="prompt">system.log</span><h2>${t('countdown.statusTitle')}</h2><p>${t('countdown.statusBody')}</p></div></section>`, 'countdown'); startTicker(); updateProgress();}
 
-function singularityPage(){shell(`<section class="page-head"><div class="eyebrow">03 // SINGULARITY FILE</div><h1>WHEN INTELLIGENCE<br><span>CHANGES THE CURVE.</span></h1><p>What people mean when they say “AI singularity” — and what they don't know.</p></section><section class="article"><h2>Working definition</h2><p>The technological singularity is a hypothetical future point at which technological progress, particularly machine intelligence, accelerates so dramatically that established methods of forecasting become unreliable.</p><div class="warning"><b>UNKNOWN ≠ INEVITABLE</b><br>There is no agreed scientific date for a singularity. Different researchers use the term differently, and some reject the concept entirely.</div><h2>Three scenario families</h2><div class="scenario"><b>A // Gradual acceleration</b><p>AI capability improves quickly but remains embedded in institutions, markets, regulation and human decision-making.</p></div><div class="scenario"><b>B // Agentic acceleration</b><p>AI systems become capable of carrying out longer sequences of work, using tools, coordinating with other systems and contributing to research.</p></div><div class="scenario"><b>C // Recursive intelligence</b><p>A hypothetical regime in which systems materially improve the process of building better AI, creating a positive feedback loop. The speed and consequences of such a loop are uncertain.</p></div><h2>The human questions</h2><ul class="terminal-list"><li>Who controls increasingly capable systems?</li><li>What values should remain stable under technological change?</li><li>How do we preserve human agency?</li><li>What does “work” mean if cognitive labor becomes cheap?</li><li>How should security and openness be balanced?</li><li>What happens to identity when synthetic minds are everywhere?</li></ul></section>`, 'singularity');}
+function singularityPage(){shell(`<section class="page-head"><div class="eyebrow">${t('singularity.eyebrow')}</div><h1>${t('singularity.h1a')}</h1><p>${t('singularity.sub')}</p></section><section class="article"><h2>${t('singularity.defTitle')}</h2><p>${t('singularity.defBody')}</p><div class="warning">${t('singularity.warn')}</div><h2>${t('singularity.scenariosTitle')}</h2><div class="scenario"><b>${t('singularity.scA')}</b><p>${t('singularity.scAd')}</p></div><div class="scenario"><b>${t('singularity.scB')}</b><p>${t('singularity.scBd')}</p></div><div class="scenario"><b>${t('singularity.scC')}</b><p>${t('singularity.scCd')}</p></div><h2>${t('singularity.questionsTitle')}</h2><ul class="terminal-list">${['q1','q2','q3','q4','q5','q6'].map(q=>`<li>${t('singularity.'+q)}</li>`).join('')}</ul></section>`, 'singularity');}
 
-let WQ = '', WT = '', WL = 'en';
-const TAG_LABELS = {
-  all: { en: 'ALL', ca: 'TOTES', cast: 'TODAS' },
-  ia: { en: 'INTELLIGENCE', ca: 'INTEL·LIGÈNCIA', cast: 'INTELIGENCIA' },
-  seg: { en: 'SECURITY', ca: 'SEGURETAT', cast: 'SEGURIDAD' },
-  fut: { en: 'FUTURE', ca: 'FUTUR', cast: 'FUTURO' },
-  fil: { en: 'PHILOSOPHY', ca: 'FILOSOFIA', cast: 'FILOSOFÍA' },
-  bio: { en: 'LIFE', ca: 'VIDA', cast: 'VIDA' },
-  cul: { en: 'CULTURE', ca: 'CULTURA', cast: 'CULTURA' },
-  rel: { en: 'RELATED:', ca: 'RELACIONATS:', cast: 'RELACIONADOS:' }
-};
-function wikiPage(){shell(`<section class="page-head"><div class="eyebrow">04 // MATRIX WIKI</div><h1>DECODE<br><span>THE FUTURE.</span></h1><p>An extensive field guide to the vocabulary behind AI-2199 — <b id="wiki-count">${wiki.length}</b>/${wiki.length} entries and counting.</p></section><div class="wiki-controls"><input id="wiki-q" class="wiki-search" placeholder="SEARCH A TERM…" autocomplete="off" /><div class="wiki-filters">${['all','ia','seg','fut','fil','bio','cul'].map(t=>`<button class="wiki-filter${t==='all'?' active':''}" data-tag="${t}">${TAG_LABELS[t][WL]}</button>`).join('')}</div><div class="wiki-langs">${['en','ca','cast'].map(l=>`<button class="wiki-lang${l===WL?' active':''}" data-lang="${l}">${l==='ca'?'CAT':l==='cast'?'CAST':'EN'}</button>`).join('')}</div></div><section id="wiki-grid" class="wiki-grid"></section><section class="external"><div><div class="eyebrow">CONNECTED NODE</div><h2>matrix-codes.netlify.app</h2><p>Code, experiments and the hacker side of the project.</p></div><a class="btn primary" href="${links.codes}" target="_blank" rel="noopener">OPEN MATRIX CODES ↗</a></section><section class="external second"><div><div class="eyebrow">ORIGIN PROJECT</div><h2>matrix-mind.netlify.app</h2><p>AI-2199 is presented as a project of Matrix Mind.</p></div><a class="btn ghost" href="${links.mind}" target="_blank" rel="noopener">OPEN MATRIX MIND ↗</a></section>`, 'wiki');
+let WQ = '', WT = '';
+function tagLabel(tag){ return tag === 'all' ? t('wiki.all') : t('wiki.tag.' + tag); }
+function dk(){ return LANG_KEY[LANG]; }
+function wikiPage(){shell(`<section class="page-head"><div class="eyebrow">${t('wiki.eyebrow')}</div><h1>${t('wiki.h1a')}</h1><p>${t('wiki.intro', { n: '<b id="wiki-count">' + wiki.length + '</b>' })}</p></section><div class="wiki-controls"><input id="wiki-q" class="wiki-search" placeholder="${t('wiki.search')}" autocomplete="off" /><div class="wiki-filters">${['all','ia','seg','fut','fil','bio','cul'].map(x=>`<button class="wiki-filter${x==='all'?' active':''}" data-tag="${x}">${tagLabel(x)}</button>`).join('')}</div></div><section id="wiki-grid" class="wiki-grid"></section><section class="external"><div><div class="eyebrow">${t('wiki.externalCodes')}</div><h2>matrix-codes.netlify.app</h2><p>${t('wiki.externalCodesDesc')}</p></div><a class="btn primary" href="${links.codes}" target="_blank" rel="noopener">${t('wiki.openCodes')}</a></section><section class="external second"><div><div class="eyebrow">${t('wiki.externalMind')}</div><h2>matrix-mind.netlify.app</h2><p>${t('wiki.externalMindDesc')}</p></div><a class="btn ghost" href="${links.mind}" target="_blank" rel="noopener">${t('wiki.openMind')}</a></section>`, 'wiki');
   const grid = document.getElementById('wiki-grid');
   const q = document.getElementById('wiki-q');
   q.addEventListener('input', () => { WQ = q.value; renderWiki(); });
   grid.addEventListener('click', e => {
     const chip = e.target.closest('.chip');
-    if (chip) { WQ = chip.dataset.t; WT = ''; q.value = WQ; syncWikiFilters(); renderWiki(); }
+    if (chip) { WQ = chip.dataset.t; WT = ''; q.value = WQ; syncWikiFilters(); renderWiki(); return; }
+    const card = e.target.closest('.wiki-item');
+    if (card) openWikiModal(card.dataset.open);
+  });
+  grid.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { const card = e.target.closest('.wiki-item'); if (card) openWikiModal(card.dataset.open); }
   });
   document.querySelectorAll('.wiki-filter').forEach(b => b.addEventListener('click', () => { WT = b.dataset.tag === 'all' ? '' : b.dataset.tag; syncWikiFilters(); renderWiki(); }));
-  document.querySelectorAll('.wiki-lang').forEach(b => b.addEventListener('click', () => {
-    WL = b.dataset.lang;
-    document.querySelectorAll('.wiki-lang').forEach(x => x.classList.toggle('active', x === b));
-    document.querySelectorAll('.wiki-filter').forEach(x => x.textContent = TAG_LABELS[x.dataset.tag][WL]);
-    renderWiki();
-  }));
   renderWiki();
 }
 function syncWikiFilters(){ document.querySelectorAll('.wiki-filter').forEach(b => b.classList.toggle('active', (WT === '' ? 'all' : WT) === b.dataset.tag)); }
 function renderWiki(){
   const grid = document.getElementById('wiki-grid'); if (!grid) return;
   const raw = WQ.trim().toLowerCase();
-  const rows = wiki.filter(([n, t, tags, rels, d]) => {
-    if (raw && ![n, t, ...rels, d.en, d.ca, d.cast].join(' ').toLowerCase().includes(raw)) return false;
-    if (WT && !tags.includes(WT)) return false;
+  const k = dk();
+  const rows = wiki.filter(it => {
+    if (raw && ![it.n, it.term, ...it.rels].join(' ').toLowerCase().includes(raw)) return false;
+    if (raw && !it.d[k].toLowerCase().includes(raw)) return false;
+    if (WT && !it.tags.includes(WT)) return false;
     return true;
   });
-  grid.innerHTML = rows.map(([n, t, tags, rels, d]) => `<article class="wiki-item"><span>${n}</span><div class="wiki-tags">${tags.map(x => `<i class="ptag ${x}">${TAG_LABELS[x][WL]}</i>`).join('')}</div><h2>${t}</h2><p>${d[WL]}</p>${rels.length ? `<p class="wiki-rel">${TAG_LABELS.rel[WL]} ${rels.map(r => `<button class="chip" data-t="${r}">${r}</button>`).join(' ')}</p>` : ''}</article>`).join('') || `<p class="wiki-empty">NO RESULTS</p>`;
+  grid.innerHTML = rows.map(it => `<article class="wiki-item" tabindex="0" data-open="${it.term}"><span>${it.n}</span><div class="wiki-tags">${it.tags.map(x => `<i class="ptag ${x}">${tagLabel(x)}</i>`).join('')}</div><h2>${it.term}</h2><p>${it.d[k]}</p><button class="wiki-open">↗ ${t('card.read')}</button></article>`).join('') || `<p class="wiki-empty">NO RESULTS</p>`;
   const c = document.getElementById('wiki-count'); if (c) c.textContent = rows.length;
 }
+function wikiEntry(term){ return wiki.find(w => w.term === term); }
+function openWikiModal(term){
+  const it = wikiEntry(term); if (!it) return;
+  const k = dk();
+  const long = it.long && it.long[k];
+  const facets = it.facets && it.facets[k];
+  const alias = it.alias && it.alias[k] && it.alias[k] !== it.term ? `<div class="modal-alias">${it.alias[k]}</div>` : '';
+  let linksHtml = '';
+  if (it.wiki) {
+    const idx = { cat: 2, cast: 1, eng: 0 }[LANG];
+    const host = { cat: 'ca', cast: 'es', eng: 'en' }[LANG];
+    if (it.wiki[idx]) linksHtml += `<a class="modal-link" href="https://${host}.wikipedia.org/wiki/${it.wiki[idx]}" target="_blank" rel="noopener">Wikipedia ↗</a>`;
+  }
+  linksHtml += `<a class="modal-link" href="https://duckduckgo.com/?q=${encodeURIComponent(it.term + ' AI')}" target="_blank" rel="noopener">${t('modal.websearch')} ↗</a>`;
+  document.getElementById('modal-body').innerHTML = `
+    <div class="eyebrow">04 // MATRIX WIKI · ${it.n}</div>
+    <h2>${it.term}</h2>
+    ${alias}
+    <div class="wiki-tags">${it.tags.map(x => `<i class="ptag ${x}">${tagLabel(x)}</i>`).join('')}</div>
+    <p class="modal-short">${it.d[k]}</p>
+    ${long ? `<h3>${t('modal.why')}</h3><p>${long}</p>` : ''}
+    ${facets && facets.length ? `<h3>${t('modal.facetTitle')}</h3><ul class="facets">${facets.map(f => `<li>${f}</li>`).join('')}</ul>` : ''}
+    ${it.rels.length ? `<h3>${t('modal.related')}</h3><p class="modal-rels">${it.rels.map(r => `<button class="chip" data-rel="${encodeURIComponent(r)}">${r}</button>`).join(' ')}</p>` : ''}
+    <h3>${t('modal.links')}</h3>
+    <div class="modal-links">${linksHtml}</div>`;
+  document.getElementById('modal-body').addEventListener('click', e => {
+    const ch = e.target.closest('[data-rel]');
+    if (ch) openWikiModal(decodeURIComponent(ch.dataset.rel));
+  });
+  document.getElementById('wiki-modal').classList.add('open');
+  document.body.classList.add('modal-open');
+}
+window.openWikiModal = openWikiModal;
+function closeWikiModal(){ document.getElementById('wiki-modal').classList.remove('open'); document.body.classList.remove('modal-open'); }
+window.closeWikiModal = closeWikiModal;
 
-function manifestoPage(){shell(`<section class="page-head"><div class="eyebrow">05 // MANIFESTO</div><h1>BUILD THE FUTURE.<br><span>QUESTION THE SYSTEM.</span></h1></section><section class="manifesto"><ol>${['Curiosity before certainty.','Capability without ethics is incomplete.','Security research should protect people.','Human agency matters even when machines become more capable.','Long-term thinking is a technology too.','A countdown is useful when it makes us act in the present.'].map((x,i)=>`<li><b>0${i+1}</b><span>${x}</span></li>`).join('')}</ol></section>`, 'manifesto');}
+function manifestoPage(){shell(`<section class="page-head"><div class="eyebrow">${t('manifesto.eyebrow')}</div><h1>${t('manifesto.h1a')}</h1></section><section class="manifesto"><ol>${MAN.map((k,i)=>`<li><b>0${i+1}</b><span>${t('manifesto.'+k)}</span></li>`).join('')}</ol></section>`, 'manifesto');}
 
-function timelinePage(){shell(`<section class="page-head"><div class="eyebrow">06 // TIMELINE</div><h1>173 YEARS.<br><span>ONE UNKNOWN.</span></h1></section><section class="timeline">${milestones.map(([y,t,d])=>`<article><div class="year">${y}</div><div class="dot"></div><div><span class="eyebrow">${t}</span><p>${d}</p></div></article>`).join('')}</section><div class="center"><a class="btn primary" href="#/countdown">RETURN TO CLOCK →</a></div>`, 'timeline');}
+function timelinePage(){shell(`<section class="page-head"><div class="eyebrow">${t('timeline.eyebrow')}</div><h1>${t('timeline.h1a')}</h1></section><section class="timeline">${TL.map(([y,lbl,dsc])=>`<article><div class="year">${y}</div><div class="dot"></div><div><span class="eyebrow">${t(lbl)}</span><p>${t(dsc)}</p></div></article>`).join('')}</section><div class="center"><a class="btn primary" href="#/countdown">${t('timeline.back')}</a></div>`, 'timeline');}
 
-function faqPage(){shell(`<section class="page-head"><div class="eyebrow">07 // FAQ</div><h1>QUESTIONS<br><span>FROM THE TERMINAL.</span></h1></section><section class="faq">${[['Is 2199 a prediction?','No. It is a symbolic target date and a thought experiment. The countdown should not be interpreted as a scientific forecast.'],['Why talk about a “singularity”?','Because the term is useful for exploring a family of hypotheses about extremely rapid technological change. It remains contested and uncertain.'],['Who made AI-2199?','AI-2199 is a project of Matrix Mind. The site links to matrix-mind.netlify.app and the related Matrix Codes project.'],['Can I share the countdown?','Yes. Use the share button or copy the viral message. The page works without an account.'],['Does the site track me?','The front-end is designed to work without a database or login. If you add analytics later, update the privacy notice accordingly.'],['Can I fork it?','Yes. Treat the code as an experimental starting point and replace the branding/links if you create your own version.']].map(([q,a])=>`<details><summary>${q}<span>+</span></summary><p>${a}</p></details>`).join('')}</section>`, 'faq');}
+function faqPage(){shell(`<section class="page-head"><div class="eyebrow">${t('faq.eyebrow')}</div><h1>${t('faq.h1a')}</h1></section><section class="faq">${FAQ.map(([q,a])=>`<details><summary>${t('faq.'+q)}<span>+</span></summary><p>${t('faq.'+a)}</p></details>`).join('')}</section>`, 'faq');}
 
-function aboutPage(){shell(`<section class="page-head"><div class="eyebrow">08 // ABOUT</div><h1>AI-2199<br><span>IS A SIGNAL.</span></h1></section><section class="article"><p class="bigp">A cinematic web experiment about the long future of machine intelligence.</p><p>Project of <a href="${links.mind}" target="_blank">Matrix Mind</a>. Connected to <a href="${links.codes}" target="_blank">Matrix Codes</a>.</p><h2>Design language</h2><p>Dark terminal surfaces, phosphor-green highlights, scanlines, monospaced typography, glitch accents and Matrix-inspired code rain. The visual language is intentionally fictional and cyberpunk; it does not represent a claim that reality is a simulation.</p><h2>Build notes</h2><p>Static front-end. The countdown runs in the browser. No backend is required. This makes it straightforward to deploy on Netlify, Vercel or GitHub Pages.</p></section>`, 'about');}
-function notFound(){shell(`<section class="page-head"><div class="eyebrow">ERROR 404</div><h1>NODE NOT<br><span>FOUND.</span></h1><a class="btn primary" href="#/">RETURN HOME</a></section>`);}
+function aboutPage(){shell(`<section class="page-head"><div class="eyebrow">${t('about.eyebrow')}</div><h1>${t('about.h1a')}</h1></section><section class="article"><p class="bigp">${t('about.bigp')}</p><p>${t('about.p1', { mind: links.mind, codes: links.codes })}</p><h2>${t('about.designTitle')}</h2><p>${t('about.designBody')}</p><h2>${t('about.buildTitle')}</h2><p>${t('about.buildBody')}</p></section>`, 'about');}
+function notFound(){shell(`<section class="page-head"><div class="eyebrow">${t('nf.eyebrow')}</div><h1>${t('nf.h1a')}</h1><a class="btn primary" href="#/">${t('nf.back')}</a></section>`);}
 
 function startTicker(){clearInterval(window.countTimer); window.countTimer=setInterval(()=>{const v=countdownValues(); ['years','days','hours','mins','secs'].forEach((id)=>{const el=document.getElementById(id); if(el) el.textContent=id==='years'?v.years:id==='days'?String(v.days).padStart(6,'0'):String(v[id]).padStart(2,'0');});},1000);}
 function updateProgress(){const span=TARGET-ORIGIN, elapsed=new Date()-ORIGIN, pct=Math.min(100,Math.max(0,elapsed/span))*100; const fill=document.getElementById('meter-fill'); const text=document.getElementById('percent'); if(fill) fill.style.width=pct+'%'; if(text) text.textContent=pct.toFixed(6)+'%';}
-function toast(msg){const t=document.querySelector('#toast'); if(!t)return; t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
-async function shareSite(){const data={title:'AI-2199 — The Singularity Countdown',text:`The clock is running. See how much time remains until 01.01.2199 → ${location.href}`}; try{if(navigator.share) await navigator.share(data); else {await navigator.clipboard.writeText(location.href);toast('LINK COPIED TO CLIPBOARD');}}catch{} }
-async function copyViral(){const v=countdownValues();const text=`There are ${v.years} years left until 01.01.2199. AI-2199 is counting down to the symbolic horizon of the singularity. How much time do we have? ${location.origin}${location.pathname}#/countdown`; try{await navigator.clipboard.writeText(text);toast('VIRAL MESSAGE COPIED');}catch{toast('COPY FAILED — SELECT THE LINK MANUALLY');}}
+function toast(msg){const el=document.querySelector('#toast'); if(!el)return; el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2600);}
+async function shareSite(){const data={title:t('share.title'),text:t('share.text',{url:location.href}),url:location.href}; try{if(navigator.share) await navigator.share(data); else {await navigator.clipboard.writeText(location.href);toast(t('toast.linkCopied'));}}catch{} }
+async function copyViral(){const v=countdownValues();const text=t('share.viral',{y:v.years,url:`${location.origin}${location.pathname}#/countdown`}); try{await navigator.clipboard.writeText(text);toast(t('toast.viralCopied'));}catch{toast(t('toast.copyFailed'));}}
 window.shareSite=shareSite; window.copyViral=copyViral;
 function openTerminal(){document.querySelector('#terminal')?.classList.remove('hidden');setTimeout(()=>document.querySelector('#term-input')?.focus(),50)}
 function closeTerminal(){document.querySelector('#terminal')?.classList.add('hidden')}
 window.openTerminal=openTerminal;window.closeTerminal=closeTerminal;
-function bindTerminal(){const form=document.querySelector('#term-form');if(!form)return;form.onsubmit=e=>{e.preventDefault();const input=document.querySelector('#term-input');const cmd=input.value.trim().toLowerCase();const out=document.querySelector('#term-output');input.value='';let r='';if(cmd==='help')r='commands: help · status · wiki · matrix · countdown · share · clear · exit';else if(cmd==='status')r='SYSTEM ONLINE // TARGET 2199-01-01 // ETHICAL MODE: ON';else if(cmd==='wiki')r='OPENING MATRIX WIKI…';else if(cmd==='matrix')r='FOLLOW THE GREEN NODE → matrix-codes.netlify.app';else if(cmd==='countdown')r='ROUTING TO COUNTDOWN…';else if(cmd==='share')r='COPYING SIGNAL…';else if(cmd==='clear'){out.innerHTML='';return;}else if(cmd==='exit'){closeTerminal();return;}else r=`unknown command: ${cmd || '∅'}`;out.innerHTML+=`<p><span class="green">guest@2199:~$</span> ${cmd}</p><p>${r}</p>`;if(cmd==='wiki')location.hash='/wiki';if(cmd==='countdown')location.hash='/countdown';if(cmd==='share')copyViral();};}
+function bindTerminal(){const form=document.querySelector('#term-form');if(!form)return;form.onsubmit=e=>{e.preventDefault();const input=document.querySelector('#term-input');const cmd=input.value.trim().toLowerCase();const out=document.querySelector('#term-output');input.value='';let r='';if(cmd==='help')r=t('terminal.help');else if(cmd==='status')r=t('terminal.status');else if(cmd==='wiki')r=t('terminal.wiki');else if(cmd==='matrix')r=t('terminal.matrix');else if(cmd==='countdown')r=t('terminal.countdown');else if(cmd==='share')r=t('terminal.share');else if(cmd==='clear'){out.innerHTML='';return;}else if(cmd==='exit'){closeTerminal();return;}else r=`${t('terminal.unknown')}: ${cmd || '∅'}`;out.innerHTML+=`<p><span class="green">guest@2199:~$</span> ${cmd}</p><p>${r}</p>`;if(cmd==='wiki')location.hash='/wiki';if(cmd==='countdown')location.hash='/countdown';if(cmd==='share')copyViral();};}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeWikiModal(); closeTerminal(); } });
 window.addEventListener('hashchange',route);route();
 
 // Matrix-style background. Decorative only.

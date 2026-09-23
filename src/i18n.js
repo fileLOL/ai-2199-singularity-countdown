@@ -103,7 +103,7 @@ export const I18N = {
     'modal.related': 'TERMES RELACIONATS',
     'modal.links': 'ENLLAÇOS EXTERNS',
     'modal.websearch': 'CERCA A LA WEB',
-    'modal.chatBtn': 'PARLA'N AMB L\'ASSISTENT',
+    'modal.chatBtn': 'PARLA\'N AMB L\'ASSISTENT',
     'modal.facetTitle': 'EN RESUM',
     'pills.hint': 'Fa més d\'un minut que llegeixes la wiki.',
     'pills.continue': 'SEGUIR LLEGINT',
